@@ -114,6 +114,8 @@ does not perform OAuth, and runtime credential resolution rereads the owned sour
 
 ## Entrypoints
 
+`src/update/install-detection.mjs` examines both lexical and resolved package paths. An enclosing mise installation owns its nested npm/aube package only when the adjacent `.mise.backend.toml` identifies the containing tool alias and the canonical `npm:@bitkyc08/opencodex` backend. That verified outer owner takes precedence over the inner npm layout. `ocx update`, dashboard update checks, and update workers expose `installer: "mise"`; checks remain read-only, while mutation is refused with `mise upgrade <verified-alias>` before any proxy stop, package write, or worker creation. Unreadable or contradictory ownership metadata also refuses mutation without inventing a tool name. The package-tree integrity guard remains active for mise packages.
+
 | Path | Responsibility |
 | --- | --- |
 | `bin/ocx.mjs` | Published npm `bin` entry (Node shim). Resolves the bundled or explicit Bun binary before project dotenv can load, stamps its runtime provenance plus a proof-bound Anthropic parent-env snapshot, lazy-runs `bun/install.js` if only the placeholder stub is present, then execs `src/cli/index.ts` under Bun. Lets `npm install -g` work without a separately-installed Bun. The exact `system codex-cli-update` inspection namespace skips both boot repair and lazy Bun installation; missing runtime support fails closed instead of mutating state. |
