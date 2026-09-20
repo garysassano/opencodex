@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, unlinkSync } from "node:fs";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 import { isLocalAttestationSecret } from "../lib/local-management-attestation";
 import { assertNotRealHomeUnderTest } from "../lib/test-home-guard";
 import {
@@ -9,6 +9,7 @@ import {
 } from "../lib/windows-elevation";
 import { atomicWriteFile } from "./atomic-write";
 import { getConfigDir, hardenConfigDir } from "./paths";
+import type { PackageIdentity } from "../lib/package-tree-integrity";
 
 export function getPidPath(): string {
   return join(getConfigDir(), "ocx.pid");
@@ -36,20 +37,38 @@ export type RuntimePortState = {
   hostname?: string;
   /** Per-process proof key; protected by the config directory and never served. */
   attestationSecret?: string;
+  /** Package manifest identity captured when this process booted. */
+  packageIdentity?: PackageIdentity;
+  /** True only for a process started by an installed service definition. */
+  serviceManaged?: boolean;
 };
+
+function isPackageIdentity(value: unknown): value is PackageIdentity {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const identity = value as Record<string, unknown>;
+  if (!["packagePath", "version", "packageDevice", "packageInode", "packageContentTimeNs", "packageSize", "device", "inode", "contentTimeNs", "size"]
+    .every(key => typeof identity[key] === "string" && identity[key].length > 0)) return false;
+  return isAbsolute(identity.packagePath as string)
+    && ["packageDevice", "packageInode", "packageContentTimeNs", "packageSize", "device", "inode", "contentTimeNs", "size"]
+      .every(key => /^\d+$/.test(identity[key] as string));
+}
 
 function isValidRuntimePortState(value: unknown): value is RuntimePortState {
   if (!value || typeof value !== "object") return false;
   const state = value as Record<string, unknown>;
   const hostnameOk = state.hostname === undefined || typeof state.hostname === "string";
   const attestationOk = state.attestationSecret === undefined || isLocalAttestationSecret(state.attestationSecret);
+  const packageIdentityOk = state.packageIdentity === undefined || isPackageIdentity(state.packageIdentity);
+  const serviceManagedOk = state.serviceManaged === undefined || typeof state.serviceManaged === "boolean";
   return Number.isSafeInteger(state.pid)
     && Number(state.pid) > 0
     && Number.isInteger(state.port)
     && Number(state.port) > 0
     && Number(state.port) <= 65535
     && hostnameOk
-    && attestationOk;
+    && attestationOk
+    && packageIdentityOk
+    && serviceManagedOk;
 }
 
 export function writeRuntimePort(state: RuntimePortState): void {

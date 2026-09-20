@@ -407,12 +407,14 @@ enough there: the definition did not change, and a repair that changes nothing r
 If the proxy is newer instead, check the CLI installation and `PATH` as described under
 [`ocx status`](#ocx-status---json).
 
+Use `ocx service restart --if-needed --json` after an explicit external upgrade. It resolves the service's recorded stable launcher, compares the selected package with the running process's boot package identity, and keeps the PID when they match. A changed installation, same-version reinstall, package-tree replacement, or older runtime without identity gets one supervised restart. The command skips an absent or intentionally stopped service and fails without starting a standalone proxy when ownership, the service manager, the replacement, health, or readiness cannot be verified.
+
 | Subcommand | Action |
 | --- | --- |
 | none | Install and start when absent; otherwise `repair` the existing service. A healthy Windows scheduler definition is reused; a stale definition may be re-registered and require elevation. |
 | `install` | Create and start the service. Registers it, which on Windows needs elevation. |
 | `repair` | Refresh an installed service in place. On macOS, the manager is reloaded only when something changed, so a healthy, unchanged job keeps running and the repair is not an outage. On Linux and Windows, the service is restarted; a healthy Windows scheduler definition is reused, while a stale definition may be re-registered and require elevation. |
-| `restart` | The same refresh and a guaranteed restart on every platform. On macOS an unchanged, already-loaded job is kickstarted in place. Not an alias of `repair`. |
+| `restart` | The same refresh and a guaranteed restart on every platform. On macOS an unchanged, already-loaded job is kickstarted in place. Not an alias of `repair`. Add `--if-needed` to restart only when the selected package differs; add `--json` for a machine-readable result. |
 | `start` | Start an installed service. |
 | `stop` | Stop the service and restore native Codex. |
 | `status` | Report service and proxy diagnostics plus log paths. |
@@ -428,6 +430,7 @@ ocx service
 ocx service install
 ocx service repair
 ocx service restart
+ocx service restart --if-needed --json
 ocx service status
 ocx service uninstall
 ```

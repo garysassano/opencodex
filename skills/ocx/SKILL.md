@@ -174,6 +174,8 @@ Details, including the one-port recipe, the invite flow and key rotation's two-s
 so a restart is never a hand-written `launchctl kickstart`:
 `references/04_failure_semantics.md`.
 
+After an external package-manager upgrade, use `ocx service restart --if-needed --json`. It preserves a healthy matching PID, restarts a changed or legacy runtime through its installed supervisor, and fails closed rather than starting a standalone proxy.
+
 ## References
 
 | File | Use it for |

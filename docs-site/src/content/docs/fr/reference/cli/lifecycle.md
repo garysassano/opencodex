@@ -192,6 +192,8 @@ de cette commande. Voir la [référence anglaise](/reference/cli/lifecycle/) pou
 
 ### `ocx service [install|repair|restart|start|stop|status|uninstall|remove]`
 
+Après une mise à niveau externe explicite, utilisez `ocx service restart --if-needed --json`. La commande conserve le PID si le paquet sélectionné correspond à l’identité chargée au démarrage, redémarre une seule fois via le gestionnaire de services si l’installation a changé, et ignore explicitement un service absent ou arrêté. Elle échoue sans lancer de proxy autonome si la propriété, le remplacement, le gestionnaire, l’état de santé ou la disponibilité ne peuvent pas être vérifiés.
+
 Exécute opencodex comme service d’arrière-plan géré à l’ouverture de session — **launchd** sous macOS, **unité utilisateur systemd** sous Linux et **Task Scheduler** sous Windows — qui démarre automatiquement à la connexion et redémarre après un plantage. Les services définissent `OCX_SERVICE=1` afin qu’un redémarrage ne réécrive pas inutilement la configuration Codex.
 
 Les installations via le Planificateur de tâches Windows utilisent une priorité de processus normale (`Priority=4`).

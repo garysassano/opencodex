@@ -242,7 +242,7 @@ function instrumentRecoveryLauncher(source: string, directory: string): string {
   const boot = 'const probe = bootRestoreProbe(resolve(here, ".."));';
   replaceOnce(boot, `fixtureStatus("boot-restore-enter");\n    ${boot}\n    fixtureStatus("boot-restore-result", { action: probe.action });`);
   replaceOnce('} catch { /* the probe must never block launch */ }', '} catch (error) { fixtureStatus("boot-restore-error", recoveryErrorFields(error)); /* the probe must never block launch */ }');
-  const runtime = 'const bunRuntime = resolveBun({ allowInstall: !codexCliUpdateInspection });';
+  const runtime = 'const bunRuntime = resolveBun({ allowInstall: !readOnlyInspection });';
   replaceOnce(runtime, `fixtureStatus("runtime-resolution-enter");\n${runtime}\nfixtureStatus("runtime-resolved", { source: bunRuntime.source });`);
   const install = 'const r = spawnSync(process.execPath, [installJs], { stdio: "inherit" });';
   replaceOnce(install, `fixtureStatus("runtime-install-enter");\n    ${install}\n    fixtureStatus("runtime-install-result", { exitCode: r.status, signal: r.signal, ...recoveryErrorFields(r.error) });`);
@@ -343,7 +343,7 @@ describe("bounded recovery diagnostics", () => {
       'import { spawn, spawnSync } from "node:child_process";',
       'const probe = bootRestoreProbe(resolve(here, ".."));',
       '} catch { /* the probe must never block launch */ }',
-      'const bunRuntime = resolveBun({ allowInstall: !codexCliUpdateInspection });',
+      'const bunRuntime = resolveBun({ allowInstall: !readOnlyInspection });',
       'const r = spawnSync(process.execPath, [installJs], { stdio: "inherit" });',
       'const child = spawn(bun,', 'child.on("exit", (code, signal) => {',
       'child.on("error", err => {', 'const clearHandlers = () => {',
@@ -429,7 +429,8 @@ function resolveBun() {
   const r = spawnSync(process.execPath, [installJs], { stdio: "inherit" });
   return { source: "bundled", path: "fixture-bun" };
 }
-const bunRuntime = resolveBun({ allowInstall: !codexCliUpdateInspection });
+const readOnlyInspection = false;
+const bunRuntime = resolveBun({ allowInstall: !readOnlyInspection });
 const bun = bunRuntime.path;
 const child = spawn(bun, ["fixture-cli", "start"], childOptions);
 const clearHandlers = () => { events.push("clear"); };

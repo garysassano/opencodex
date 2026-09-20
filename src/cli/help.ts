@@ -33,7 +33,7 @@ Usage:
   ocx recover-history --ocx-compaction <thread-id> --yes
                                Back up and make one ocx1-compacted thread replayable by native Codex
   ocx uninstall               Remove service/shim/config and restore native Codex (alias: remove)
-  ocx service [sub]           Run as a background service (default: install/update/start)
+  ocx service [sub]           Run as a background service; restart --if-needed refreshes changed packages
   ocx codex-shim <sub>        Auto-start proxy when \`codex\` launches (install|status|uninstall|remove)
   ocx tray <sub>              Windows status tray (install|start|stop|status|uninstall)
   ocx ensure                  Ensure the proxy is running and Codex config/cache are current

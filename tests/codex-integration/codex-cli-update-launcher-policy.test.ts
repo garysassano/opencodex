@@ -26,9 +26,18 @@ describe("Codex CLI updater launcher policy", () => {
     const probeCall = source.indexOf("const probe = bootRestoreProbe(");
     expect(probeCall).toBeGreaterThan(0);
     const guard = source.slice(source.lastIndexOf("if (", probeCall), probeCall);
-    expect(guard).toContain("!codexCliUpdateInspection");
+    expect(guard).toContain("!readOnlyInspection");
     expect(guard).toContain("isNodeModulesInstall()");
-    expect(source).toContain("resolveBun({ allowInstall: !codexCliUpdateInspection })");
+    expect(source).toContain("resolveBun({ allowInstall: !readOnlyInspection })");
     expect(source).toContain("if (allowInstall && existsSync(installJs))");
+  });
+
+  test("package identity inspection also skips launcher and shim mutation", () => {
+    const launcher = readFileSync(repoPath("bin", "ocx.mjs"), "utf8");
+    const root = readFileSync(repoPath("src", "cli", "root.ts"), "utf8");
+    expect(launcher).toContain('const packageIdentityInspection = process.argv[2] === "system" && process.argv[3] === "package-identity"');
+    expect(launcher).toContain("const readOnlyInspection = codexCliUpdateInspection || packageIdentityInspection");
+    expect(launcher).toContain("resolveBun({ allowInstall: !readOnlyInspection })");
+    expect(root).toContain('head.command === "system" && head.args[1] === "package-identity"');
   });
 });

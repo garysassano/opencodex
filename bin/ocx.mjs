@@ -739,6 +739,8 @@ if (updateHelpRequested) {
 }
 
 const codexCliUpdateInspection = isCodexCliUpdateInspectionArgv(process.argv);
+const packageIdentityInspection = process.argv[2] === "system" && process.argv[3] === "package-identity";
+const readOnlyInspection = codexCliUpdateInspection || packageIdentityInspection;
 if (codexCliUpdateInspection && typeof process.versions.bun === "string") {
   console.error("opencodex: codex-cli-update inspection must use the published Node launcher.");
   process.exit(1);
@@ -765,7 +767,7 @@ if (process.argv[2] === "update" && isNodeModulesInstall() && !isBunGlobalInstal
 // #1849 boot probe: a prior update that lost power (or double-faulted) mid-swap leaves a
 // backup sibling and a broken live tree. Restore before anything tries to run from the
 // broken tree; reap stale backups once the live tree verifies healthy.
-if (!codexCliUpdateInspection && installMethod === "npm" && isNodeModulesInstall() && !isBunGlobalInstall()) {
+if (!readOnlyInspection && installMethod === "npm" && isNodeModulesInstall() && !isBunGlobalInstall()) {
   try {
     const probe = bootRestoreProbe(resolve(here, ".."));
     if (probe.action === "restored") {
@@ -776,7 +778,7 @@ if (!codexCliUpdateInspection && installMethod === "npm" && isNodeModulesInstall
   } catch { /* the probe must never block launch */ }
 }
 
-const bunRuntime = resolveBun({ allowInstall: !codexCliUpdateInspection });
+const bunRuntime = resolveBun({ allowInstall: !readOnlyInspection });
 const bun = bunRuntime.path;
 
 // Run the Bun child asynchronously and FORWARD termination signals to it, then wait

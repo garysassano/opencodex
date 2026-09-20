@@ -217,10 +217,30 @@ describe("proxy process-state ownership", () => {
 
   test("runtime port metadata round-trips and validates the expected pid", () => {
     const attestationSecret = "A".repeat(43);
-    writeRuntimePort({ pid: 1234, port: 58195, hostname: "0.0.0.0", attestationSecret });
+    const packageIdentity = {
+      packagePath: join(testDir, "package with spaces"),
+      version: "preview+opaque",
+      packageDevice: "1",
+      packageInode: "9",
+      packageContentTimeNs: "90",
+      packageSize: "4096",
+      device: "1",
+      inode: "2",
+      contentTimeNs: "3",
+      size: "4",
+    };
+    const expected = {
+      pid: 1234,
+      port: 58195,
+      hostname: "0.0.0.0",
+      attestationSecret,
+      packageIdentity,
+      serviceManaged: true,
+    };
+    writeRuntimePort(expected);
 
-    expect(readRuntimePort()).toEqual({ pid: 1234, port: 58195, hostname: "0.0.0.0", attestationSecret });
-    expect(readRuntimePort(1234)).toEqual({ pid: 1234, port: 58195, hostname: "0.0.0.0", attestationSecret });
+    expect(readRuntimePort()).toEqual(expected);
+    expect(readRuntimePort(1234)).toEqual(expected);
     expect(readRuntimePort(9999)).toBeNull();
   });
 
@@ -239,6 +259,28 @@ describe("proxy process-state ownership", () => {
     writeFileSync(
       getRuntimePortPath(),
       JSON.stringify({ pid: 1234, port: 58195, attestationSecret: "too-short" }),
+      "utf-8",
+    );
+    expect(readRuntimePort()).toBeNull();
+
+    writeFileSync(
+      getRuntimePortPath(),
+      JSON.stringify({
+        pid: 1234,
+        port: 58195,
+        packageIdentity: {
+          packagePath: "relative/package",
+          version: "1.0.0",
+          packageDevice: "1",
+          packageInode: "9",
+          packageContentTimeNs: "90",
+          packageSize: "4096",
+          device: "one",
+          inode: "2",
+          contentTimeNs: "3",
+          size: "4",
+        },
+      }),
       "utf-8",
     );
     expect(readRuntimePort()).toBeNull();

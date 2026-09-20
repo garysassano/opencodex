@@ -29,7 +29,7 @@ describe("ocx.mjs package launcher (source invariants)", () => {
     expect(spawnCall).toContain("[BUN_RUNTIME_SOURCE_ENV]: bunRuntime.source");
 
     // Path and source come from one resolution, so the marker cannot describe another binary.
-    expect(source).toContain("const bunRuntime = resolveBun({ allowInstall: !codexCliUpdateInspection });");
+    expect(source).toContain("const bunRuntime = resolveBun({ allowInstall: !readOnlyInspection });");
     expect(source).toContain("const bun = bunRuntime.path;");
     expect(source).toContain('return { path: bin, source: "bundled" };');
 

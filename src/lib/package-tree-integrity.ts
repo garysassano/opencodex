@@ -1,4 +1,6 @@
-import { statSync } from "node:fs";
+import { readFileSync, realpathSync, statSync } from "node:fs";
+import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { isStandaloneBinary } from "./standalone";
 
 export interface PackageTreeObservation {
@@ -6,6 +8,19 @@ export interface PackageTreeObservation {
   readonly inode: bigint;
   readonly contentTimeNs: bigint;
   readonly size: bigint;
+}
+
+export interface PackageIdentity {
+  readonly packagePath: string;
+  readonly version: string;
+  readonly packageDevice: string;
+  readonly packageInode: string;
+  readonly packageContentTimeNs: string;
+  readonly packageSize: string;
+  readonly device: string;
+  readonly inode: string;
+  readonly contentTimeNs: string;
+  readonly size: string;
 }
 
 export type PackageTreeIntegrityStatus =
@@ -44,6 +59,50 @@ function observePackageManifest(): PackageTreeObservation | null {
   } catch {
     return null;
   }
+}
+
+export function observePackageIdentity(): PackageIdentity | null {
+  try {
+    const manifestPath = realpathSync(fileURLToPath(packageManifestUrl));
+    const packagePath = dirname(manifestPath);
+    const manifestStat = statSync(manifestPath, { bigint: true });
+    const packageStat = statSync(packagePath, { bigint: true });
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as { version?: unknown };
+    if (typeof manifest.version !== "string" || manifest.version.length === 0) return null;
+    return {
+      packagePath,
+      version: manifest.version,
+      packageDevice: packageStat.dev.toString(),
+      packageInode: packageStat.ino.toString(),
+      packageContentTimeNs: packageStat.mtimeNs.toString(),
+      packageSize: packageStat.size.toString(),
+      device: manifestStat.dev.toString(),
+      inode: manifestStat.ino.toString(),
+      contentTimeNs: manifestStat.mtimeNs.toString(),
+      size: manifestStat.size.toString(),
+    };
+  } catch {
+    return null;
+  }
+}
+
+const bootPackageIdentity = observePackageIdentity();
+
+export function runtimeBootPackageIdentity(): PackageIdentity | null {
+  return bootPackageIdentity;
+}
+
+export function samePackageIdentity(left: PackageIdentity, right: PackageIdentity): boolean {
+  return left.packagePath === right.packagePath
+    && left.version === right.version
+    && left.packageDevice === right.packageDevice
+    && left.packageInode === right.packageInode
+    && left.packageContentTimeNs === right.packageContentTimeNs
+    && left.packageSize === right.packageSize
+    && left.device === right.device
+    && left.inode === right.inode
+    && left.contentTimeNs === right.contentTimeNs
+    && left.size === right.size;
 }
 
 function sameObservation(left: PackageTreeObservation, right: PackageTreeObservation): boolean {

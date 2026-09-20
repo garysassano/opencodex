@@ -10,6 +10,7 @@ import {
   takeOption,
   type RuntimeApiDeps,
 } from "./runtime-api";
+import { runtimeBootPackageIdentity } from "../lib/package-tree-integrity";
 
 const USAGE = `Usage:
   ocx system [status] [--json]
@@ -186,7 +187,14 @@ export async function handleSystemCommand(argv: string[], deps: RuntimeApiDeps =
     return await handleCodexCliUpdateCommand(rest);
   }
   return runCliAction(async () => {
-    if (sub === "status") await status(rest, deps);
+    if (sub === "package-identity") {
+      const args = [...rest];
+      takeFlag(args, "--json");
+      rejectArgs(args, USAGE);
+      const identity = runtimeBootPackageIdentity();
+      if (!identity) throw new Error("The OpenCodex package identity could not be read.");
+      console.log(JSON.stringify(identity));
+    } else if (sub === "status") await status(rest, deps);
     else if (sub === "settings") await settings(rest, deps);
     else if (sub === "startup") await startup(rest, deps);
     else if (sub === "diagnostics") {

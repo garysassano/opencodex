@@ -170,6 +170,8 @@ ocx status --json
 
 ### `ocx service [install|repair|restart|start|stop|status|uninstall|remove]`
 
+完成明確的外部升級後，請執行 `ocx service restart --if-needed --json`。如果目前選取的套件與程序啟動時的套件識別相符，命令會保留原 PID；如果安裝已變更，則透過現有服務管理器只重新啟動一次。服務不存在或刻意停止時會明確略過；無法驗證擁有權、替換安裝、服務管理器、健康狀態或就緒狀態時，命令會失敗且不會啟動獨立代理。
+
 將 opencodex 作為登入管理的背景服務執行（macOS **launchd**、Linux **systemd user unit**、Windows **Task Scheduler**），在登入時自動啟動並在崩潰時自動重啟。服務執行時設定 `OCX_SERVICE=1`，使重啟不會折騰 Codex 設定。
 
 Windows 工作排程器安裝使用一般處理程序優先順序（`Priority=4`）。舊的背景優先順序（`7`，省略時排程器也預設使用 `7`）

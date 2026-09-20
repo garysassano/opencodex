@@ -28,3 +28,5 @@ export type { ServiceDiagnostic, WindowsTaskDiagnosticIdentityDeps, WindowsServi
 export { bakedServicePathsDiagnostic, serviceStartableFromTray, resolveWindowsTaskDiagnosticUserId, deriveWindowsServiceDiagnostic, deriveWindowsServiceDiagnosticForCurrentUser, deriveLaunchdServiceDiagnostic, diagnoseService, serviceStatusSummary, serviceStatusReport } from "./service/diagnostics";
 export type { ParsedServiceArgs, ServiceInstallationState, ServiceInstallationProbe, ServiceInstallationProbeHooks, ServiceCommandPlan } from "./service/cli";
 export { normalizeServiceSubcommand, probeServiceInstallation, selectServiceSubcommand, planServiceCommand, parseServiceArgs, serviceCommand } from "./service/cli";
+export type { ConditionalRestartResult, ConditionalRestartDeps } from "./service/conditional-restart";
+export { ConditionalRestartError, conditionalServiceRestart } from "./service/conditional-restart";

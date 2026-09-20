@@ -228,17 +228,27 @@ describe("winsw install flow", () => {
 
 describe("service backend CLI parsing", () => {
   test("install --native selects the native backend", () => {
-    expect(parseServiceArgs(["install", "--native"])).toEqual({ sub: "install", backend: "native", invalid: [] });
+    expect(parseServiceArgs(["install", "--native"])).toEqual({ sub: "install", backend: "native", ifNeeded: false, json: false, invalid: [] });
   });
 
   test("bare service defaults to install with no backend override", () => {
-    expect(parseServiceArgs([])).toEqual({ sub: "install", backend: null, invalid: [] });
+    expect(parseServiceArgs([])).toEqual({ sub: "install", backend: null, ifNeeded: false, json: false, invalid: [] });
   });
 
   test("restart is its own verb: parsed like repair, no backend flag, no admin path", () => {
     // `restart` used to alias `repair`; since repair became a no-op on a healthy launchd job,
     // `restart` carries its own verb so the darwin path can kickstart the unchanged job.
-    expect(parseServiceArgs(["restart"])).toEqual({ sub: "restart", backend: null, invalid: [] });
+    expect(parseServiceArgs(["restart"])).toEqual({ sub: "restart", backend: null, ifNeeded: false, json: false, invalid: [] });
+  });
+
+  test("restart accepts the conditional JSON contract", () => {
+    expect(parseServiceArgs(["restart", "--if-needed", "--json"])).toEqual({
+      sub: "restart",
+      backend: null,
+      ifNeeded: true,
+      json: true,
+      invalid: [],
+    });
   });
 
   test("--scheduler and unknown flags are recognized separately", () => {

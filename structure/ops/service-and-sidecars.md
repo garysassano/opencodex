@@ -54,6 +54,8 @@ PATH, so a launcher-backed job is never misreported as an older plist (#3464).
 
 > Decision record: [ADR-0030](../decisions/ADR-0030-stable-service-launcher-launchd-and-systemd.md)
 
+`src/service/conditional-restart.ts` implements the opt-in `ocx service restart --if-needed --json` refresh. It verifies service ownership and the live PID, asks the recorded stable launcher for its current canonical package identity, and compares that with the boot identity in `runtime-port.json` before touching the manager. A match is a no-op; changed files or a legacy record use the existing restart lifecycle and require a different service-managed PID on the original port with matching package/version plus healthy and ready probes. Absent and stopped services are skipped, while unavailable managers and ambiguous evidence fail without a standalone fallback. A per-home SQLite transaction serializes concurrent refreshes so a waiter re-evaluates the completed replacement.
+
 ## Sidecars
 
 Web search and vision sidecars run only when the main request needs that capability and a usable

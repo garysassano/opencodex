@@ -281,6 +281,8 @@ Codex의 로컬 모델 선택기 캐시를 무효화하여, 활성 opencodex 카
 
 ### `ocx service [install|repair|restart|start|stop|status|uninstall|remove]`
 
+명시적인 외부 업그레이드 후에는 `ocx service restart --if-needed --json`을 사용합니다. 선택된 패키지가 부팅 시 패키지 ID와 같으면 PID를 유지하고, 설치가 변경되면 서비스 관리자를 통해 한 번만 재시작합니다. 서비스가 없거나 의도적으로 중지된 경우에는 명시적으로 건너뛰며, 소유권, 교체 대상, 서비스 관리자, 상태 또는 준비 상태를 확인할 수 없으면 독립 실행형 프록시를 시작하지 않고 실패합니다.
+
 로그인 관리형 백그라운드 서비스로 opencodex를 실행합니다(macOS **launchd**, Linux **systemd** 사용자
 유닛, Windows **Task Scheduler**). 로그인 시 자동 시작하고 충돌 시 자동 재시작합니다. 서비스 실행은
 `OCX_SERVICE=1`을 설정하므로 재시작해도 Codex 설정이 흔들리지 않습니다.

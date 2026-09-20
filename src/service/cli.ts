@@ -20,6 +20,10 @@ import { inspectWindowsSchedulerServiceStatus, schtasksErrorDetail, probeWindows
 import type { WindowsSchedulerTaskProbe } from "./windows-scheduler";
 import { win32 } from "node:path";
 import { serviceDiagnosticsSummary } from "./diagnostics";
+import {
+  conditionalServiceRestart,
+  ConditionalRestartError,
+} from "./conditional-restart";
 
 /**
  * `restart` is NO LONGER folded into `repair`.
@@ -39,6 +43,8 @@ export function normalizeServiceSubcommand(sub?: string): string {
 export interface ParsedServiceArgs {
   sub: string;
   backend: ServiceBackend | null;
+  ifNeeded: boolean;
+  json: boolean;
   invalid: string[];
 }
 
@@ -132,6 +138,12 @@ export function planServiceCommand(
   if (parsed.backend && parsed.sub !== "install") {
     return { ok: false, message: "--native/--scheduler apply to `ocx service install` only; other subcommands use the installed backend." };
   }
+  if ((parsed.ifNeeded || parsed.json) && parsed.sub !== "restart") {
+    return { ok: false, message: "--if-needed and --json apply to `ocx service restart` only." };
+  }
+  if (parsed.json && !parsed.ifNeeded) {
+    return { ok: false, message: "--json requires `ocx service restart --if-needed`." };
+  }
   if (parsed.backend === "native" && (options.platform ?? process.platform) !== "win32") {
     return { ok: false, message: "--native (WinSW) is Windows-only." };
   }
@@ -163,6 +175,8 @@ export function planServiceCommand(
 export function parseServiceArgs(args: string[]): ParsedServiceArgs {
   let sub: string | undefined;
   let backend: ServiceBackend | null = null;
+  let ifNeeded = false;
+  let json = false;
   const invalid: string[] = [];
   for (const arg of args) {
     if (arg === "--native") {
@@ -173,11 +187,13 @@ export function parseServiceArgs(args: string[]): ParsedServiceArgs {
       if (backend === "native") { invalid.push("--scheduler (conflicts with --native)"); continue; }
       backend = "scheduler";
     }
+    else if (arg === "--if-needed") ifNeeded = true;
+    else if (arg === "--json") json = true;
     else if (arg.startsWith("--")) invalid.push(arg);
     else if (sub === undefined) sub = arg;
     else invalid.push(arg);
   }
-  return { sub: normalizeServiceSubcommand(sub), backend, invalid };
+  return { sub: normalizeServiceSubcommand(sub), backend, ifNeeded, json, invalid };
 }
 
 export async function serviceCommand(...args: (string | undefined)[]): Promise<void> {
@@ -191,37 +207,59 @@ export async function serviceCommand(...args: (string | undefined)[]): Promise<v
       process.exit(1);
     }
     const { parsed, command } = plan;
-  if (command === "repair" || command === "restart") {
-    const verb: ServiceRepairVerb = command === "restart" ? "restart" : "repair";
-    assertServiceEnvironmentMatchesInstall();
-    assertServiceAuthEnvironment();
-    // A throw used to escape straight to the top level, so the one command that can
-    // leave a macOS hub evicted never reached its own serving check (#4236, defect 1f).
-    // Still ask whether anything is listening: on darwin the rollback inside installLaunchd
-    // may have brought the previous job back, and on Windows the preserve/restart protocol
-    // may have done the same. The operator needs both halves of that answer, and the exit
-    // code stays non-zero either way.
-    //
-    // The failure text travels INTO that report rather than being printed here. Printing it
-    // here and then letting the report reach its success line stated both outcomes for one
-    // run — "❌ Service repair failed: ... exit code 199" beside "✅ opencodex service
-    // repaired and serving on port 10100" — and the checkmark was the false half: the
-    // existing registration had been restarted, not repaired (#4914).
-    let repairError: unknown;
-    try {
-      await repairService({ verb });
-    } catch (error) {
-      repairError = error;
-      process.exitCode = 1;
+    if (command === "restart" && parsed.ifNeeded) {
+      try {
+        const result = await conditionalServiceRestart();
+        if (parsed.json) console.log(JSON.stringify(result));
+        else if (result.action === "skipped") {
+          console.log(result.reason === "service_absent"
+            ? "Service refresh skipped: no service is installed."
+            : "Service refresh skipped: the installed service is intentionally stopped.");
+        } else if (result.action === "unchanged") {
+          console.log(`Service is already running the selected OpenCodex package (PID ${result.pid}); no restart needed.`);
+        } else {
+          console.log(`✅ opencodex service refreshed from PID ${result.previousPid} to PID ${result.pid} on port ${result.port}.`);
+        }
+      } catch (error) {
+        const reason = error instanceof ConditionalRestartError ? error.reason : "restart_failed";
+        const message = error instanceof Error ? error.message : String(error);
+        if (parsed.json) console.log(JSON.stringify({ ok: false, action: "failed", reason, message }));
+        else console.error(`❌ Conditional service restart failed: ${message}`);
+        process.exitCode = 1;
+      }
+      return;
     }
-    // All three platforms: a repair that reports success while nothing serves is the
-    // defect class this unit exists to close. Windows bakes its port into the
-    // scheduler wrapper or the WinSW XML, both of which installedServiceListenPort()
-    // now reads.
-    await reportServiceServing(verb === "restart" ? "restarted" : "repaired", {}, repairError);
-    if (repairError !== undefined) process.exitCode = 1;
-    return;
-  }
+    if (command === "repair" || command === "restart") {
+      const verb: ServiceRepairVerb = command === "restart" ? "restart" : "repair";
+      assertServiceEnvironmentMatchesInstall();
+      assertServiceAuthEnvironment();
+      // A throw used to escape straight to the top level, so the one command that can
+      // leave a macOS hub evicted never reached its own serving check (#4236, defect 1f).
+      // Still ask whether anything is listening: on darwin the rollback inside installLaunchd
+      // may have brought the previous job back, and on Windows the preserve/restart protocol
+      // may have done the same. The operator needs both halves of that answer, and the exit
+      // code stays non-zero either way.
+      //
+      // The failure text travels INTO that report rather than being printed here. Printing it
+      // here and then letting the report reach its success line stated both outcomes for one
+      // run — "❌ Service repair failed: ... exit code 199" beside "✅ opencodex service
+      // repaired and serving on port 10100" — and the checkmark was the false half: the
+      // existing registration had been restarted, not repaired (#4914).
+      let repairError: unknown;
+      try {
+        await repairService({ verb });
+      } catch (error) {
+        repairError = error;
+        process.exitCode = 1;
+      }
+      // All three platforms: a repair that reports success while nothing serves is the
+      // defect class this unit exists to close. Windows bakes its port into the
+      // scheduler wrapper or the WinSW XML, both of which installedServiceListenPort()
+      // now reads.
+      await reportServiceServing(verb === "restart" ? "restarted" : "repaired", {}, repairError);
+      if (repairError !== undefined) process.exitCode = 1;
+      return;
+    }
   // Non-install subcommands follow the backend recorded at install time (state v2).
   const backend: ServiceBackend = parsed.backend ?? (process.platform === "win32" ? readServiceBackend() : "scheduler");
   const ops = platformOps(backend);
@@ -374,6 +412,7 @@ export async function serviceCommand(...args: (string | undefined)[]): Promise<v
       break;
     default:
       console.error("Usage: ocx service [install|repair|restart|start|stop|status|uninstall|remove] [--native|--scheduler]");
+      console.error("       ocx service restart --if-needed [--json]");
       console.error("       With no subcommand, installs when absent or repairs/restarts an existing service.");
       console.error("       repair: refresh the installed backend, reloading it only when the definition changed; stale Windows tasks may request admin approval.");
       console.error("       restart: the same refresh, but always restarts the service — on macOS a healthy job is kickstarted in place.");

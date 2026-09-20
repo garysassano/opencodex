@@ -80,7 +80,11 @@ export async function runCli(argv: string[]): Promise<CliHead> {
       return head;
     }
     case "command":
-      maybeAutoRestoreCodexShim(head.command, head.args);
+      // The service refresh preflight invokes the recorded stable launcher only to
+      // identify its package. Keep that inspection free of unrelated shim mutation.
+      if (!(head.command === "system" && head.args[1] === "package-identity")) {
+        maybeAutoRestoreCodexShim(head.command, head.args);
+      }
       return head;
   }
 }

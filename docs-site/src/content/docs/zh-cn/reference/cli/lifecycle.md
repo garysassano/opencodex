@@ -176,6 +176,8 @@ ocx status --json
 
 ### `ocx service [install|repair|restart|start|stop|status|uninstall|remove]`
 
+完成明确的外部升级后，请运行 `ocx service restart --if-needed --json`。如果当前选择的软件包与进程启动时的软件包标识一致，命令会保留原 PID；如果安装已变化，则通过现有服务管理器仅重启一次。服务不存在或被有意停止时会明确跳过；无法验证所有权、替换安装、服务管理器、健康状态或就绪状态时，命令会失败且不会启动独立代理。
+
 将 opencodex 作为登录管理的后台服务运行（macOS **launchd**、Linux **systemd user unit**、Windows **Task Scheduler**），在登录时自动启动，在崩溃时自动重启。服务运行会设置 `OCX_SERVICE=1`，因此重启时不会反复改动 Codex 配置。
 
 Windows 任务计划程序安装使用普通进程优先级（`Priority=4`）。旧的后台优先级（`7`，省略时调度器也默认使用 `7`）

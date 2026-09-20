@@ -10,6 +10,7 @@ import { hardenSecretPath } from "../lib/windows-secret-acl";
 import { recordOwnedConfigPath } from "../lib/config-ownership";
 import { isProtectedHomeUnderTest, isTestHomeGuardArmed } from "../lib/test-home-guard";
 import { isStandaloneBinary } from "../lib/standalone";
+import { detectInstallOwnershipFromPath } from "../update/install-detection.mjs";
 
 /**
  * Written only by the launchd plist and the systemd unit. `OCX_SERVICE=1` cannot stand in
@@ -91,13 +92,22 @@ export function stableLauncherEntry(deps: {
       return false;
     }
   });
+  const miseShimFor = (launcher: string): string | null => {
+    const ownership = detectInstallOwnershipFromPath(launcher);
+    if (ownership.installer !== "mise" || !ownership.owner) return null;
+    const dataDir = dirname(dirname(ownership.owner.toolRoot));
+    const shim = join(dataDir, "shims", "ocx");
+    return isAbsolute(shim) && isExecutableFile(shim) ? shim : null;
+  };
   const recorded = (deps.state === undefined ? readServiceInstallState() : deps.state)?.launcherPath;
-  if (recorded && isAbsolute(recorded) && isExecutableFile(recorded)) return recorded;
+  if (recorded && isAbsolute(recorded) && isExecutableFile(recorded)) {
+    return miseShimFor(recorded) ?? recorded;
+  }
   const entries = (env.PATH ?? "").split(deps.pathDelimiter ?? delimiter);
   for (const entry of entries) {
     if (!entry || !isAbsolute(entry)) continue;
     const candidate = join(entry, "ocx");
-    if (isExecutableFile(candidate)) return candidate;
+    if (isExecutableFile(candidate)) return miseShimFor(candidate) ?? candidate;
   }
   return null;
 }

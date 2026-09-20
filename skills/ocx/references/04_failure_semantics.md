@@ -90,6 +90,7 @@ task, on either verb.
 
 A bare `ocx service` still selects `repair`, so it will not bounce a healthy hub. Reserve
 `ocx service repair` for a job loaded from an older plist, or not loaded at all.
+After an external package-manager upgrade, `ocx service restart --if-needed --json` compares the running boot package with the recorded launcher's current target. Matching packages are a successful no-op; changed packages and legacy records restart once through the installed manager; absent or stopped services are explicitly skipped.
 `launchctl kickstart -k gui/$(id -u)/com.opencodex.proxy` is still a correct manual fallback
 and the failure path names it, but do not lead with it. `ocx restart` is a different verb
 entirely: it restarts a proxy process, not the service the manager supervises.
@@ -135,4 +136,3 @@ empty one and getting a 400 that looks like a bug in the verb.
 Starring the repository has no CLI verb and no failure code, because it has no CLI path at all. It
 spends the user's GitHub identity and the server requires a dashboard session for exactly that
 reason. `ocx inspect star` reads status; if starring is wanted, ask the user.
-

@@ -292,6 +292,8 @@ değildir. Tam `--json` zarfı ve çıkış kodları için [İngilizce referansa
 
 ### `ocx service [install|repair|restart|start|stop|status|uninstall|remove]`
 
+Açık bir harici yükseltmeden sonra `ocx service restart --if-needed --json` kullanın. Seçilen paket başlangıçtaki paket kimliğiyle eşleşirse PID korunur; kurulum değiştiyse servis yöneticisi üzerinden yalnızca bir kez yeniden başlatılır. Servis yoksa veya bilerek durdurulmuşsa açıkça atlanır; sahiplik, yeni kurulum, servis yöneticisi, sağlık ya da hazır olma durumu doğrulanamazsa bağımsız bir proxy başlatılmadan hata döner.
+
 opencodex'i oturum açmada otomatik başlayan ve çökmede otomatik yeniden başlayan
 oturumla yönetilen bir arka plan servisi (macOS **launchd**, Linux **systemd
 kullanıcı birimi**, Windows **Görev Zamanlayıcı**) olarak çalıştırın. Servis

@@ -126,6 +126,8 @@ import { selfLaunchArgv } from "../lib/self-launch-argv";
 import { initializeNodeLauncherContext } from "./launcher-context";
 import { createLocalAttestationSecret } from "../lib/local-management-attestation";
 import { MEMORY_DRAIN_RESTART_MS, REPLACEMENT_READY_TIMEOUT_MS } from "../lib/system-restart-contract";
+import { runtimeBootPackageIdentity } from "../lib/package-tree-integrity";
+import { SERVICE_MANAGED_ENV } from "../service/state";
 
 /**
  * A failed shell-hook reconcile is not cosmetic: a stale hook keeps sourcing
@@ -492,7 +494,14 @@ async function handleStart(options: { block?: boolean } = {}) {
   writePid(process.pid);
 
   const config = loadConfig();
-  writeRuntimePort({ pid: process.pid, port, hostname: config.hostname, attestationSecret: localAttestationSecret });
+  writeRuntimePort({
+    pid: process.pid,
+    port,
+    hostname: config.hostname,
+    attestationSecret: localAttestationSecret,
+    packageIdentity: runtimeBootPackageIdentity() ?? undefined,
+    serviceManaged: process.env[SERVICE_MANAGED_ENV] === "1",
+  });
   // No pre-emptive snapshot here. `injectCodexConfig` journals the exact bytes it
   // is about to transform; snapshotting earlier only captured a baseline that could
   // already be stale by the time injection ran (#477).

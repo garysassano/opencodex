@@ -5,12 +5,17 @@ on:
     branches: [main, dev]
     paths:
       - "src/service.ts"
+      - "src/service/**"
       # Keep in sync with the release.yml service-gate regex (release.yml "Require
       # successful Cross-platform CI" step). src/cli.ts is the pre-restructure compat
       # stub that durable launchers still execute.
       - "src/cli.ts"
       - "src/cli/index.ts"
+      - "src/config/process-state.ts"
       - "src/lib/bun-runtime.ts"
+      - "src/lib/package-tree-integrity.ts"
+      - "bin/ocx.mjs"
+      - ".github/scripts/mise-service-fixture-registry.ts"
       - "package.json"
       - "bun.lock"
       - ".github/workflows/service-lifecycle.yml"
@@ -21,10 +26,15 @@ on:
   push:
     paths:
       - "src/service.ts"
+      - "src/service/**"
       # Keep in sync with the release.yml service-gate regex (see above).
       - "src/cli.ts"
       - "src/cli/index.ts"
+      - "src/config/process-state.ts"
       - "src/lib/bun-runtime.ts"
+      - "src/lib/package-tree-integrity.ts"
+      - "bin/ocx.mjs"
+      - ".github/scripts/mise-service-fixture-registry.ts"
       - "package.json"
       - "bun.lock"
       - ".github/workflows/service-lifecycle.yml"
@@ -48,6 +58,11 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
       - uses: ./.github/actions/setup-project-bun
+      - uses: jdx/mise-action@9e7f7633ff6f6d6048a9418a68d48f288f50eb14 # v4.2.3
+        with:
+          version: 2026.9.11
+          install: false
+          cache: false
 
       - run: bun install --frozen-lockfile
 
@@ -63,7 +78,7 @@ jobs:
       - name: Write minimal config
         run: |
           mkdir -p ~/.opencodex
-          echo '{"port":10199,"providers":{}}' > ~/.opencodex/config.json
+          echo '{"port":10199,"providers":{},"clientIntegrations":{"codex":false}}' > ~/.opencodex/config.json
 
       - name: Install service
         run: bun run src/cli/index.ts service install
@@ -86,6 +101,83 @@ jobs:
             echo "::error::systemd service did not become healthy"
             exit 1
           fi
+
+      - name: Verify mise-owned package refresh
+        run: |
+          set -euo pipefail
+          fixture_root="$(mktemp -d)"
+          registry_pid=""
+          cleanup() {
+            if [ -n "$registry_pid" ]; then kill "$registry_pid" 2>/dev/null || true; fi
+            rm -rf "$fixture_root"
+          }
+          trap cleanup EXIT
+          mkdir -p "$fixture_root/packages"
+
+          for version in 90.0.1 90.0.2; do
+            package_root="$fixture_root/package-$version"
+            mkdir -p "$package_root"
+            git archive HEAD | tar -x -C "$package_root"
+            jq --arg version "$version" '.version = $version' "$package_root/package.json" > "$package_root/package.json.next"
+            mv "$package_root/package.json.next" "$package_root/package.json"
+            npm pack --ignore-scripts --pack-destination "$fixture_root/packages" "$package_root" >/dev/null
+          done
+
+          bun .github/scripts/mise-service-fixture-registry.ts "$fixture_root/packages" > "$fixture_root/registry.log" 2>&1 &
+          registry_pid=$!
+          for attempt in $(seq 1 20); do
+            if curl --max-time 2 -sf http://127.0.0.1:4873/%40bitkyc08%2Fopencodex >/dev/null; then break; fi
+            if [ "$attempt" = 20 ]; then cat "$fixture_root/registry.log"; exit 1; fi
+            sleep 1
+          done
+
+          export MISE_DATA_DIR="$fixture_root/mise-data"
+          export MISE_CACHE_DIR="$fixture_root/mise-cache"
+          export MISE_CONFIG_DIR="$fixture_root/mise-config"
+          export MISE_GLOBAL_CONFIG_FILE="$MISE_CONFIG_DIR/config.toml"
+          export NPM_CONFIG_REGISTRY=http://127.0.0.1:4873
+          system_node_dir="$(dirname "$(command -v node)")"
+          mise_bin_dir="$(dirname "$(command -v mise)")"
+          export PATH="$system_node_dir:$mise_bin_dir:$MISE_DATA_DIR/shims:/usr/local/bin:/usr/bin:/bin"
+          mkdir -p "$MISE_CONFIG_DIR"
+          printf '[tools]\nopencodex = { version = "90.0.1", allow_builds = ["bun"] }\n\n[tool_alias]\nopencodex = "npm:@bitkyc08/opencodex"\n' > "$MISE_CONFIG_DIR/config.toml"
+          mise install opencodex@90.0.1
+          mise reshim
+
+          ocx service repair
+          pid_a="$(jq -r .pid "$HOME/.opencodex/runtime-port.json")"
+          no_change="$(ocx service restart --if-needed --json)"
+          test "$(jq -r .action <<<"$no_change")" = unchanged
+          test "$(jq -r .pid <<<"$no_change")" = "$pid_a"
+
+          mise use --global --pin opencodex@90.0.2
+          changed="$(mise exec -- ocx service restart --if-needed --json)"
+          pid_b="$(jq -r .pid <<<"$changed")"
+          test "$(jq -r .action <<<"$changed")" = restarted
+          test "$pid_b" != "$pid_a"
+          test "$(curl --max-time 2 -sf http://127.0.0.1:10199/healthz | jq -r .version)" = 90.0.2
+
+          repeated="$(mise exec -- ocx service restart --if-needed --json)"
+          test "$(jq -r .action <<<"$repeated")" = unchanged
+          test "$(jq -r .pid <<<"$repeated")" = "$pid_b"
+
+          mise install --force opencodex@90.0.2
+          mise reshim
+          reinstalled="$(mise exec -- ocx service restart --if-needed --json)"
+          pid_reinstalled="$(jq -r .pid <<<"$reinstalled")"
+          test "$(jq -r .action <<<"$reinstalled")" = restarted
+          test "$pid_reinstalled" != "$pid_b"
+
+          mise install --force opencodex@90.0.2
+          mise reshim
+          mise exec -- ocx service restart --if-needed --json > "$fixture_root/refresh-one.json" &
+          refresh_one_pid=$!
+          mise exec -- ocx service restart --if-needed --json > "$fixture_root/refresh-two.json" &
+          refresh_two_pid=$!
+          wait "$refresh_one_pid"
+          wait "$refresh_two_pid"
+          jq -e -s 'map(.action) | sort == ["restarted", "unchanged"]' \
+            "$fixture_root/refresh-one.json" "$fixture_root/refresh-two.json"
 
       - name: ocx stop should stop the service too
         run: |
