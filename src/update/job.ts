@@ -28,8 +28,7 @@ import { isOpencodexHealthz, probeHostname, proxyIdentityAt, type HealthzIdentit
 import { isServiceInstalled, isServiceViable, readServiceBackend, stopWindows } from "../service";
 import { runUpdateRestartWithOwnershipLease, type ServiceOwnershipResolution } from "./restart-ownership";
 import {
-  type Channel,
-  type Installer,
+  type Channel, type Installer,
   PKG,
   checkUpdatePackageIntegrity,
   currentVersion,
@@ -509,7 +508,6 @@ export function checkForUpdate(
 
   if (installer === "source") {
     reason = "source_checkout";
-    command = manualSourceCommand();
   } else if (installer === "mise") {
     reason = command ? "externally_managed" : "external_ownership_invalid";
   } else if (!latest) {

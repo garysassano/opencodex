@@ -19,6 +19,8 @@ import { readUpdateBadge } from "../../src/update/badge";
 import type { InstallOwnership } from "../../src/update/index";
 
 const BACKEND = 'short = "ocx-local"\nfull = "npm:@bitkyc08/opencodex"\nexplicit_backend = false\n';
+const metadataProbe = (exists: (path: string) => boolean) =>
+  (path: string): "present" | "absent" => exists(path) ? "present" : "absent";
 
 function misePackage(root: string, version = "2.59.0"): string {
   const toolRoot = join(root, "custom mise data", "installs", "ocx-local");
@@ -83,6 +85,7 @@ describe("mise installation ownership", () => {
     const path = "/tmp/.mise/node_modules/@bitkyc08/opencodex/bin";
     expect(detectInstallOwnershipFromPath(path, {
       exists: () => false,
+      probe: () => "absent",
       realpath: value => value,
     })).toEqual({ installer: "npm" });
   });
@@ -92,6 +95,7 @@ describe("mise installation ownership", () => {
     const metadata = "/tmp/node_modules/mise-data/installs/ocx-local/.mise.backend.toml";
     expect(detectInstallOwnershipFromPath(path, {
       exists: value => value === metadata,
+      probe: metadataProbe(value => value === metadata),
       readFile: () => BACKEND,
       realpath: value => value,
     })).toMatchObject({
@@ -100,17 +104,45 @@ describe("mise installation ownership", () => {
     });
   });
 
+  test("preserves literal backslashes in POSIX install paths", () => {
+    const path = "/tmp/mise\\state/installs/ocx-local/2.59.0/node_modules/@bitkyc08/opencodex/bin";
+    const metadata = "/tmp/mise\\state/installs/ocx-local/.mise.backend.toml";
+    expect(detectInstallOwnershipFromPath(path, {
+      probe: metadataProbe(value => value === metadata),
+      readFile: () => BACKEND,
+      realpath: value => value,
+    })).toMatchObject({
+      installer: "mise",
+      owner: { toolRoot: "/tmp/mise\\state/installs/ocx-local" },
+    });
+  });
+
+  test("accepts mise's full npm identifier and encoded directory name", () => {
+    const path = "/data/installs/npm-bitkyc08-opencodex/2.59.0/node_modules/@bitkyc08/opencodex/bin";
+    const metadata = "/data/installs/npm-bitkyc08-opencodex/.mise.backend.toml";
+    expect(detectInstallOwnershipFromPath(path, {
+      probe: metadataProbe(value => value === metadata),
+      readFile: () => 'short = "npm:@bitkyc08/opencodex"\nfull = "npm:@bitkyc08/opencodex"\n',
+      realpath: value => value,
+    })).toMatchObject({
+      installer: "mise",
+      owner: { tool: "npm:@bitkyc08/opencodex" },
+    });
+  });
+
   test("fails closed when adjacent ownership metadata is unreadable or contradictory", () => {
     const path = "/data/installs/ocx-local/2.59.0/node_modules/@bitkyc08/opencodex/bin";
     const metadata = "/data/installs/ocx-local/.mise.backend.toml";
     expect(detectInstallOwnershipFromPath(path, {
       exists: value => value === metadata,
+      probe: metadataProbe(value => value === metadata),
       readFile: () => { throw new Error("denied"); },
       realpath: value => value,
     })).toEqual({ installer: "mise", owner: null, error: "metadata_unreadable" });
 
     expect(detectInstallOwnershipFromPath(path, {
       exists: value => value === metadata,
+      probe: metadataProbe(value => value === metadata),
       readFile: () => 'short = "different-alias"\nfull = "npm:@bitkyc08/opencodex"\n',
       realpath: value => value,
     })).toEqual({ installer: "mise", owner: null, error: "metadata_inconsistent" });
@@ -121,6 +153,7 @@ describe("mise installation ownership", () => {
     const resolved = "/other/installs/opencodex/2.59.0/node_modules/@bitkyc08/opencodex/bin";
     expect(detectInstallOwnershipFromPath(lexical, {
       exists: value => value.endsWith("/.mise.backend.toml"),
+      probe: metadataProbe(value => value.endsWith("/.mise.backend.toml")),
       readFile: value => value.startsWith("/data/")
         ? BACKEND
         : 'short = "opencodex"\nfull = "npm:@bitkyc08/opencodex"\n',
@@ -133,6 +166,7 @@ describe("mise installation ownership", () => {
     const resolved = "/other/installs/opencodex/2.59.0/node_modules/@bitkyc08/opencodex/bin";
     expect(detectInstallOwnershipFromPath(lexical, {
       exists: value => value.endsWith("/.mise.backend.toml"),
+      probe: metadataProbe(value => value.endsWith("/.mise.backend.toml")),
       readFile: value => {
         if (value.startsWith("/other/")) throw new Error("denied");
         return BACKEND;
@@ -146,6 +180,7 @@ describe("mise installation ownership", () => {
     const resolved = "/other/installs/opencodex/2.59.0/node_modules/@bitkyc08/opencodex/bin";
     expect(detectInstallOwnershipFromPath(lexical, {
       exists: value => value.endsWith("/.mise.backend.toml"),
+      probe: metadataProbe(value => value.endsWith("/.mise.backend.toml")),
       readFile: value => value.startsWith("/data/")
         ? BACKEND
         : 'short = "different-alias"\nfull = "npm:@bitkyc08/opencodex"\n',
@@ -162,9 +197,19 @@ describe("mise installation ownership", () => {
     ]);
     expect(detectInstallOwnershipFromPath(lexical, {
       exists: value => metadata.has(value),
+      probe: metadataProbe(value => metadata.has(value)),
       readFile: () => 'short = "opencodex"\nfull = "npm:@bitkyc08/opencodex"\n',
       realpath: () => resolved,
     })).toMatchObject({ installer: "mise", owner: { tool: "opencodex" } });
+  });
+
+  test("fails closed when probing adjacent metadata is unreadable", () => {
+    const path = "/data/installs/ocx-local/2.59.0/node_modules/@bitkyc08/opencodex/bin";
+    expect(detectInstallOwnershipFromPath(path, {
+      exists: () => false,
+      probe: () => "unreadable",
+      realpath: value => value,
+    })).toEqual({ installer: "mise", owner: null, error: "metadata_unreadable" });
   });
 });
 

@@ -1,6 +1,7 @@
-import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 
 const OPENCODEX_MISE_BACKEND = "npm:@bitkyc08/opencodex";
+const OPENCODEX_MISE_BACKEND_DIR = "npm-bitkyc08-opencodex";
 
 /**
  * @typedef {{
@@ -49,6 +50,7 @@ export function detectInstallFromPath(packagePath, deps = {}) {
  * @param {string} packagePath
  * @param {{
  *   exists?: (path: string) => boolean;
+ *   probe?: (path: string) => "present" | "absent" | "unreadable";
  *   readFile?: (path: string) => string;
  *   realpath?: (path: string) => string;
  * }} deps
@@ -56,6 +58,7 @@ export function detectInstallFromPath(packagePath, deps = {}) {
  */
 export function detectInstallOwnershipFromPath(packagePath, deps = {}) {
   const exists = deps.exists ?? existsSync;
+  const probe = deps.probe ?? probeMetadata;
   const readFile = deps.readFile ?? (path => readFileSync(path, "utf8"));
   const candidates = [String(packagePath)];
   try {
@@ -72,7 +75,7 @@ export function detectInstallOwnershipFromPath(packagePath, deps = {}) {
   /** @type {"metadata_unreadable" | "metadata_inconsistent" | undefined} */
   let miseError;
   for (const candidate of candidates) {
-    const mise = detectMiseOwner(candidate, { exists, readFile });
+    const mise = detectMiseOwner(candidate, { probe, readFile });
     if (mise.recognized) {
       if (mise.owner) miseOwners.push(mise.owner);
       else miseError = mise.error;
@@ -122,7 +125,10 @@ function parseBackendMetadata(content) {
 }
 
 function detectMiseOwner(packagePath, deps) {
-  const normalized = String(packagePath).replaceAll("\\", "/").replace(/\/+$/, "");
+  const windowsPath = /^[A-Za-z]:[\\/]/.test(String(packagePath))
+    || String(packagePath).startsWith("\\\\");
+  const normalized = (windowsPath ? String(packagePath).replaceAll("\\", "/") : String(packagePath))
+    .replace(/\/+$/, "");
   const lower = normalized.toLowerCase();
   let marker = -1;
   let installPath;
@@ -134,7 +140,11 @@ function detectMiseOwner(packagePath, deps) {
     if (slash < 1) continue;
     toolRoot = installPath.slice(0, slash);
     metadataPath = `${toolRoot}/.mise.backend.toml`;
-    if (deps.exists(metadataPath)) break;
+    const metadataState = deps.probe(metadataPath);
+    if (metadataState === "present") break;
+    if (metadataState === "unreadable") {
+      return { recognized: true, owner: null, error: "metadata_unreadable" };
+    }
     metadataPath = undefined;
   }
   if (!metadataPath || !installPath || !toolRoot) return { recognized: false };
@@ -146,11 +156,15 @@ function detectMiseOwner(packagePath, deps) {
     return { recognized: true, owner: null, error: "metadata_unreadable" };
   }
   const toolDir = toolRoot.slice(toolRoot.lastIndexOf("/") + 1);
+  const expectedToolDir = metadata?.tool === OPENCODEX_MISE_BACKEND
+    ? OPENCODEX_MISE_BACKEND_DIR
+    : metadata?.tool;
   if (
     !metadata
     || metadata.backend !== OPENCODEX_MISE_BACKEND
-    || !/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(metadata.tool)
-    || !samePath(metadata.tool, toolDir, /^[A-Za-z]:\//.test(normalized))
+    || (metadata.tool !== OPENCODEX_MISE_BACKEND
+      && !/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(metadata.tool))
+    || !samePath(expectedToolDir, toolDir, windowsPath)
   ) {
     return { recognized: true, owner: null, error: "metadata_inconsistent" };
   }
@@ -165,12 +179,27 @@ function detectMiseOwner(packagePath, deps) {
   };
 }
 
+function probeMetadata(path) {
+  try {
+    statSync(path);
+    return "present";
+  } catch (error) {
+    const code = error && typeof error === "object" && "code" in error
+      ? error.code
+      : undefined;
+    return code === "ENOENT" || code === "ENOTDIR" ? "absent" : "unreadable";
+  }
+}
+
 function samePath(left, right, windows = /^[A-Za-z]:\//.test(left) && /^[A-Za-z]:\//.test(right)) {
   return windows ? left.toLowerCase() === right.toLowerCase() : left === right;
 }
 
 function detectInstallCandidate(packagePath, exists) {
-  const normalized = String(packagePath).replaceAll("\\", "/");
+  const path = String(packagePath);
+  const normalized = /^[A-Za-z]:[\\/]/.test(path) || path.startsWith("\\\\")
+    ? path.replaceAll("\\", "/")
+    : path;
   const segments = normalized.split("/").filter(Boolean);
   // Windows paths are case-insensitive. Treating the structural marker this way also
   // keeps a preserved-symlink path from being downgraded merely because its casing came

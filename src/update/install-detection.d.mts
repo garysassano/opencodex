@@ -17,6 +17,7 @@ export type InstallOwnership =
 
 export interface InstallDetectionDeps {
   exists?: (path: string) => boolean;
+  probe?: (path: string) => "present" | "absent" | "unreadable";
   readFile?: (path: string) => string;
   realpath?: (path: string) => string;
 }
