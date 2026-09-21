@@ -141,6 +141,18 @@ describe("mise installation ownership", () => {
     })).toEqual({ installer: "mise", owner: null, error: "metadata_unreadable" });
   });
 
+  test("does not let a verified owner override contradictory metadata on the other path", () => {
+    const lexical = "/data/installs/ocx-local/latest/node_modules/@bitkyc08/opencodex/bin";
+    const resolved = "/other/installs/opencodex/2.59.0/node_modules/@bitkyc08/opencodex/bin";
+    expect(detectInstallOwnershipFromPath(lexical, {
+      exists: value => value.endsWith("/.mise.backend.toml"),
+      readFile: value => value.startsWith("/data/")
+        ? BACKEND
+        : 'short = "different-alias"\nfull = "npm:@bitkyc08/opencodex"\n',
+      realpath: () => resolved,
+    })).toEqual({ installer: "mise", owner: null, error: "metadata_inconsistent" });
+  });
+
   test("handles Windows spelling without treating path case as an ownership mismatch", () => {
     const lexical = "C:\\Data Root\\mise\\installs\\OpenCodex\\2.59.0\\node_modules\\@bitkyc08\\opencodex\\bin";
     const resolved = "C:/Data Root/mise/installs/opencodex/2.59.0/node_modules/@bitkyc08/opencodex/bin";

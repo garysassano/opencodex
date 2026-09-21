@@ -81,8 +81,9 @@ export function detectInstallOwnershipFromPath(packagePath, deps = {}) {
     if (detected === "pnpm" || detected === "bun") detectedManager = detected;
     else if (detected === "npm" && detectedManager === "source") detectedManager = "npm";
   }
-  // A broken ownership boundary on either spelling wins over a verified one. Using the
-  // other candidate could authorize mutation across a lexical/resolved-path mismatch.
+  // Any recognized ownership error on either spelling takes precedence over every verified
+  // owner. Keeping a command from the other candidate could authorize mutation across a
+  // lexical/resolved-path mismatch, so fail closed without recovery guidance.
   if (miseError) return { installer: "mise", owner: null, error: miseError };
   const miseOwner = miseOwners.at(-1);
   if (miseOwner) {
