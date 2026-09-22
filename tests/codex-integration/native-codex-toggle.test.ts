@@ -142,6 +142,20 @@ describe("request validation", () => {
 });
 
 describe("turning Codex off", () => {
+  test("the status read reflects the persisted switch after a toggle with a stale server config", async () => {
+    const serverConfig = baseConfig();
+    const disabled = await put(serverConfig, { enabled: false });
+    expect(disabled.body).toMatchObject({ state: "absent", desiredEnabled: false });
+    expect(persistedCodexIntent()).toBe(false);
+
+    const response = await dispatch(serverConfig, "/api/native-integrations");
+    const body = await response!.json() as { clients: { clientId: string; state: string; desiredEnabled: boolean }[] };
+    expect(body.clients.find(client => client.clientId === "codex")).toMatchObject({
+      state: "absent",
+      desiredEnabled: false,
+    });
+  });
+
   test("persists the decision so it survives the next start", async () => {
     const result = await put(baseConfig(), { enabled: false });
     expect(result.status).toBe(200);

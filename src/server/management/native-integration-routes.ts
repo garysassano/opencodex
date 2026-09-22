@@ -784,7 +784,9 @@ export async function handleNativeIntegrationRoutes(ctx: ManagementContext): Pro
     const { getConfigPath } = await import("../../config");
     const codexConfigPath = join(getCodexHome(), "config.toml");
     return jsonResponse({
-      clients: [claudeStatus(config, getConfigPath()), grokStatus(config), codexStatus(config, codexConfigPath), desktopStatus(config)],
+      // The Codex toggle persists intent independently of the server's startup snapshot.
+      // Read that intent again so the next dashboard refresh reflects the completed PUT.
+      clients: [claudeStatus(config, getConfigPath()), grokStatus(config), codexStatus(loadConfig(), codexConfigPath), desktopStatus(config)],
     } satisfies NativeStatusListEnvelope);
   }
 
