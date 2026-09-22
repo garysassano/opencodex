@@ -551,11 +551,15 @@ describe("WP13 composed toggle acceptance", () => {
         expect(result.exitCode).toBe(0);
         expect(manifest(fx.codex)).toEqual(before);
       }
-      for (const argv of [["sync"], ["sync-cache"]]) {
-        const result = await fx.runCli(argv);
-        expect(result.exitCode).toBe(0);
-        expect(manifestWithoutCatalogArtifacts(manifest(fx.codex))).toEqual(manifestWithoutCatalogArtifacts(before));
-      }
+      const synced = await fx.runCli(["sync"]);
+      expect(synced.exitCode).toBe(0);
+      expect(manifestWithoutCatalogArtifacts(manifest(fx.codex))).toEqual(manifestWithoutCatalogArtifacts(before));
+      const unchangedCache = await fx.runCli(["sync-cache", "--json"]);
+      expect(unchangedCache.exitCode).toBe(0);
+      expect(JSON.parse(unchangedCache.stdout)).toMatchObject({
+        ok: true, wrote: false, skipped: true, skippedReason: "unchanged", desiredDisabled: true,
+      });
+      expect(manifestWithoutCatalogArtifacts(manifest(fx.codex))).toEqual(manifestWithoutCatalogArtifacts(before));
       const sync = await fx.request(server.runtime, "/api/sync", { method: "POST" });
       expect(sync.status).toBe(200);
       expect(sync.body).toMatchObject({ status: "skipped", skippedReason: "desired_disabled", ok: true });
