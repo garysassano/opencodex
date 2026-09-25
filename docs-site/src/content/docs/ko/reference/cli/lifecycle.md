@@ -430,6 +430,8 @@ Windows 상태 트레이 아이콘을 설치하고 제어합니다. Windows 로�
 
 OpenCodex가 mise를 통해 설치된 경우 이 명령은 프록시를 중지하거나 패키지 파일을 변경하기 전에 실패하며 검증된 로컬 mise 별칭을 사용한 `mise upgrade <tool>`을 표시합니다. 업데이트 확인은 계속 사용할 수 있고 외부 관리 설치로 보고합니다. mise 소유권 메타데이터를 읽을 수 없거나 일관되지 않아도 도구 이름을 추측하지 않고 변경을 거부하며, `--tag preview`는 mise에 구성된 선택을 변경하지 않습니다.
 
+Linux에서 기록된 런처가 mise 패키지 런처(mise shim이 아닌 `<tool>/latest/node_modules/.bin/ocx`)인 백그라운드 서비스는 `mise upgrade`를 스스로 따라갑니다. 새 버전이 안정된 뒤 약 10초 안에 진행 중인 요청을 드레인하고 새 버전으로 재시작하며, 실행 중이던 버전을 mise가 나중에 정리해도 같은 방식으로 복구합니다. macOS, mise shim으로 설치한 서비스, 포그라운드 프록시는 업그레이드 후 직접 재시작하세요(macOS에서는 먼저 `ocx service repair`).
+
 npm에서 opencodex를 자체 업데이트합니다. 안정판 설치는 `@latest`를 사용하고, 미리보기 설치는
 `--tag latest|preview`를 주지 않으면 `@preview`를 유지합니다. 소스 체크아웃을 감지하면 대신
 `git pull && bun install`을 실행하라고 안내하고, 해당 태그에서 이미 최신 버전이면 아무 동작도 하지
