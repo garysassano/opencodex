@@ -63,6 +63,15 @@ export interface OcxClaudeCodeConfig {
    * caller's own sk-ant-* credential (Claude Code subscription OAuth). Default: enabled.
    */
   nativePassthrough?: boolean;
+  /**
+   * Routed-only policy (devlog/_plan/261002_claude_ux): refuse official Anthropic models on the
+   * Messages surface instead of serving them from Anthropic. A claude/anthropic selector that no
+   * alias or model-interception entry claims gets a 403 whatever the credential — the caller
+   * passthrough would forward it verbatim, and without one the router would settle it on the
+   * proxy's own Anthropic account. Routed serving (provider-prefixed ids, aliases, tier slots,
+   * mapped ids, the Antigravity direct lane) is untouched. Default: off.
+   */
+  routedOnly?: boolean;
   /** Upstream for the native passthrough (tests/enterprise gateways). Default: https://api.anthropic.com */
   anthropicBaseUrl?: string;
   /**

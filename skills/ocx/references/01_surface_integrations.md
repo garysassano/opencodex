@@ -519,7 +519,7 @@ State-changing: no. JSON mode: `payload`.
 
 ### `ocx claude config set`
 
-Usage: `ocx claude config set [--enabled <on|off>] [--auth-mode <auto|proxy|subscription>] [--system-env <on|off>] [--fast-mode <on|off>] [--auto-context <on|off>] [--compact-window <tokens|default>] [--context-accounting <1m|200k>] [--inject-agents <on|off>] [--small-fast-model <id|->] [--model-map <from=to,...|->] [--blocked-skills <name,name|->] [--web-model <id|->] [--web-backend <openai|anthropic|xai|gemini|exa|->] [--vision-model <id|->] [--vision-backend <openai|anthropic|->] [--json]; or ocx claude config set --first-party <on|off> [--json]`
+Usage: `ocx claude config set [--enabled <on|off>] [--auth-mode <auto|proxy|subscription>] [--routed-only <on|off>] [--system-env <on|off>] [--fast-mode <on|off>] [--auto-context <on|off>] [--compact-window <tokens|default>] [--context-accounting <1m|200k>] [--inject-agents <on|off>] [--small-fast-model <id|->] [--model-map <from=to,...|->] [--blocked-skills <name,name|->] [--web-model <id|->] [--web-backend <openai|anthropic|xai|gemini|exa|->] [--vision-model <id|->] [--vision-backend <openai|anthropic|->] [--json]; or ocx claude config set --first-party <on|off> [--json]`
 
 Change Claude Code settings through the runtime owner.
 
@@ -533,6 +533,7 @@ State-changing: yes. JSON mode: `payload`.
 |---|---|---|
 | `--enabled` | string | on or off. |
 | `--auth-mode` | string | auto, proxy or subscription. |
+| `--routed-only` | string | on or off; refuse official Anthropic models in proxied Claude sessions. |
 | `--system-env` | string | on or off. |
 | `--fast-mode` | string | on or off. |
 | `--auto-context` | string | on or off. |

@@ -1478,6 +1478,7 @@ export async function handleAgentSettingsRoutes(ctx: ManagementContext): Promise
       enabled: config.claudeCode?.enabled !== false,
       cliFirstParty: config.claudeCode?.cliFirstParty === true,
       cliFirstPartyApplied: config.claudeCode?.cliFirstParty === true && sharedProxy === "live",
+      routedOnly: config.claudeCode?.routedOnly === true,
       desktopFirstParty: desired.desktop,
       ...interceptStatus(ctx),
       interceptEligible: eligible,
@@ -1545,7 +1546,7 @@ export async function handleAgentSettingsRoutes(ctx: ManagementContext): Promise
       return prototype === Object.prototype || prototype === null;
     };
     if (!isPlainObject(parsedBody)) return jsonResponse({ error: "body must be an object" }, 400);
-    const body = parsedBody as { enabled?: unknown; cliFirstParty?: unknown; authMode?: unknown; model?: unknown; smallFastModel?: unknown; modelMap?: unknown; classifierModel?: unknown; classifierFallbacks?: unknown; systemEnv?: unknown; fastMode?: unknown; maxContextTokens?: unknown; alwaysEnableEffort?: unknown; tierModels?: unknown; autoContext?: unknown; autoCompactWindow?: unknown; contextAccounting?: unknown; blockedSkills?: unknown; injectAgents?: unknown; webSearchSidecar?: unknown; visionSidecar?: unknown };
+    const body = parsedBody as { enabled?: unknown; cliFirstParty?: unknown; routedOnly?: unknown; authMode?: unknown; model?: unknown; smallFastModel?: unknown; modelMap?: unknown; classifierModel?: unknown; classifierFallbacks?: unknown; systemEnv?: unknown; fastMode?: unknown; maxContextTokens?: unknown; alwaysEnableEffort?: unknown; tierModels?: unknown; autoContext?: unknown; autoCompactWindow?: unknown; contextAccounting?: unknown; blockedSkills?: unknown; injectAgents?: unknown; webSearchSidecar?: unknown; visionSidecar?: unknown };
     if (body.cliFirstParty !== undefined && typeof body.cliFirstParty !== "boolean")
       return jsonResponse({ error: "cliFirstParty must be a boolean" }, 400);
     if (body.cliFirstParty !== undefined && Object.keys(body).length !== 1)
@@ -1792,6 +1793,13 @@ export async function handleAgentSettingsRoutes(ctx: ManagementContext): Promise
     if (body.systemEnv !== undefined) {
       if (typeof body.systemEnv !== "boolean") return jsonResponse({ error: "systemEnv must be a boolean" }, 400);
       next.systemEnv = body.systemEnv;
+    }
+    if (body.routedOnly !== undefined) {
+      // Routed-only stores literally; false deletes the key so the file reads as "off" the
+      // same way an unset field does (devlog 260726_claude_auth_auto's unset-is-default rule).
+      if (typeof body.routedOnly !== "boolean") return jsonResponse({ error: "routedOnly must be a boolean" }, 400);
+      if (body.routedOnly) next.routedOnly = true;
+      else delete next.routedOnly;
     }
     if (body.alwaysEnableEffort !== undefined) {
       if (typeof body.alwaysEnableEffort !== "boolean") return jsonResponse({ error: "alwaysEnableEffort must be a boolean" }, 400);

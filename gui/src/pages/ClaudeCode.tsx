@@ -41,6 +41,7 @@ function normalizeFirstPartyState(state: ClaudeCodeState): ClaudeCodeState {
     cliFirstParty: state.cliFirstParty === true,
     cliFirstPartyApplied: state.cliFirstPartyApplied === true,
     desktopFirstParty: state.desktopFirstParty === true,
+    routedOnly: state.routedOnly === true,
     interceptRunning: state.interceptRunning === true,
     interceptEligible: state.interceptEligible === undefined ? true : state.interceptEligible === true,
     sharedProxy: normalizeSharedProxy(state.sharedProxy),

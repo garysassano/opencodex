@@ -1,11 +1,12 @@
 /**
- * Whether a settled Messages route may take the managed native Messages lane (PF-08).
+ * Whether a settled Messages route may take the managed native Messages lane (PF-08), and
+ * the routed-only policy (claudeCode.routedOnly) that refuses Anthropic-hosted serving.
  *
  * PURE: reads the route, the body's structure and config, and nothing else. The Messages ingress,
  * `count_tokens` and the protocol planner (`src/protocols/plan-snapshot.ts`) all ask here, so a
- * preview, a count and the real send cannot disagree about the lane.
+ * preview, a count and the real send cannot disagree about the lane or the refusal.
  */
-import { anthropicBodyElidesBlockedSkill } from "../claude/inbound";
+import { anthropicBodyElidesBlockedSkill, resolveInboundModel } from "../claude/inbound";
 import { isClaudeWebSearchToolName } from "../claude/outbound";
 import type { ProtocolReasonCode } from "../protocols/contract";
 import { featuresFromMessagesBody } from "../protocols/features";
@@ -14,6 +15,7 @@ import { resolveProtocolSettings } from "../protocols/settings";
 import type { RouteResult } from "../router";
 import type { OcxConfig } from "../types";
 import { configuredAnthropicInstance } from "../providers/anthropic-instance";
+import { anthropicInstanceRowShapeMatches } from "../providers/anthropic-instance-id";
 import { requiresVisionPreprocessing } from "../vision";
 import { resolvePinnedEffort } from "./effort-policy";
 
@@ -156,4 +158,40 @@ export function isNativeMessagesRouteEligible(
   selector?: NativeMessagesSelector,
 ): boolean {
   return nativeMessagesDeclineReason(route, body, config, selector) === undefined;
+}
+
+// ── Routed-only (claudeCode.routedOnly) ───────────────────────────────────────────
+// The policy that refuses official Anthropic models on the Messages surface. Both
+// Anthropic-bound homes of a native selector ask here so a preview, a count and the real
+// send cannot disagree about the refusal: the caller-credential passthrough in
+// claude-messages.ts, and the routed path that would settle the request on the proxy's own
+// Anthropic account (the managed native lane and its bridge twin alike).
+
+/**
+ * Whether the selector names a native Anthropic model that no alias or model-interception
+ * entry claims. Credential-independent: such a request is Anthropic-bound whatever the
+ * caller carries, and it is exactly what `nativePassthrough`'s model test plus
+ * `resolveInboundModel`'s claim test decide for the passthrough branch.
+ */
+export function nativeClaudeModelId(model: unknown, cc: OcxConfig["claudeCode"]): model is string {
+  if (typeof model !== "string" || !/^(claude|anthropic)/i.test(model)) return false;
+  return resolveInboundModel(model, cc) === model;
+}
+
+/** The 403 text for a native selector under routed-only; names every resolve path. */
+export function routedOnlyRefusalMessage(model: string): string {
+  return "Routed-only: official Anthropic models are disabled, so \""
+    + model
+    + "\" cannot be served from Anthropic. Aim it at a routed model (tier defaults, model interception, or a provider-prefixed id), or turn routed-only off.";
+}
+
+/**
+ * Whether a settled route would serve the request from a built-in Anthropic account pool
+ * (Pool 1, or Pool 2 shaped as the bundled instance row of the same upstream). Custom rows
+ * carrying the Anthropic adapter against their own base URLs are user-configured relays,
+ * not Anthropic-hosted, and stay routed.
+ */
+export function isBuiltinAnthropicRoute(route: RouteResult): boolean {
+  return route.providerName === "anthropic"
+    || (route.providerName === "anthropic2" && anthropicInstanceRowShapeMatches(route.providerName, route.provider));
 }

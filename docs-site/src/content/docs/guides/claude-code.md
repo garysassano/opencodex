@@ -574,7 +574,40 @@ dedicated proxy admission header is valid. This also means the
 The one change to the body is tool-call ids. A `tool_use.id` or `tool_result.tool_use_id` that Anthropic would reject (characters outside `a-zA-Z0-9_-`, or longer than 64), such as one a routed model minted earlier in the session, is rewritten to a conforming id with its call/result pairing kept. Conforming ids are sent unchanged, and an empty id is answered with a local 400.
 
 Disable with `claudeCode.nativePassthrough: false`; point elsewhere with
-`claudeCode.anthropicBaseUrl`.
+`claudeCode.anthropicBaseUrl`. To keep proxied sessions from producing Anthropic-bound
+traffic at all, see [Routed-only](#routed-only-refuse-official-anthropic-models).
+
+## Routed-only (refuse official Anthropic models)
+
+`claudeCode.routedOnly: true` makes proxied Claude sessions **refuse official Anthropic
+models** instead of serving them from Anthropic. Turn it on when you do not want a proxied
+session to produce any Anthropic-bound traffic — shared machines, guest shells, or sessions
+you cannot audit individually.
+
+What gets refused (HTTP 403, `permission_error`, code `claude_routed_only`):
+
+- a `claude…`/`anthropic…` model id that no alias or `modelMap` entry claims. This closes
+  both homes of a native id: the caller-credential passthrough above, and, after
+  translation, the built-in Anthropic account pool the proxy serves (a detected
+  claude.ai OAuth login or a configured pool credential) that routing would otherwise
+  settle the request on;
+- `count_tokens` for the same ids, before its passthrough branch would forward them.
+
+Everything not Anthropic-bound keeps working: provider-prefixed ids on other providers
+(`kiro/…`, `gemini/…`, …), alias and model-map targets that route elsewhere, tier slots,
+and count-token estimates. Claude Code's own model picker still offers native ids
+(opus, sonnet, haiku), so point the [tier defaults](#tier-defaults-for-cli-and-external-launchers)
+or the [model map](#model-map-interception) at routed models — a turn naming an unmapped
+native id fails fast with the 403 above, naming the setting. The GUI Claude page shows a
+reminder while no tier slot or helper model is mapped.
+
+```bash
+ocx claude config set --routed-only on    # pass --routed-only off to disable
+```
+
+Relay providers that speak the Anthropic wire format against their own base URLs are not
+refused: routed-only targets the official pools the proxy itself serves, not the wire
+format.
 
 ## Claude Desktop on a connected remote hub
 
@@ -801,7 +834,11 @@ launch uses proxy auth or `nativePassthrough` is off, the router decides, and on
 window counts. System env and the shell file leave unset slots empty, since their values also reach
 launches that go through a hub.
 
-When both `tierModels.haiku` and `smallFastModel` are absent, OpenCodex leaves both helper variables unset; Claude Code then chooses its native helper model (currently Sonnet), which may incur native-provider charges.
+When both `tierModels.haiku` and `smallFastModel` are absent, OpenCodex leaves both helper
+variables unset; Claude Code then chooses its native helper model (currently Sonnet), which
+may incur native-provider charges. With
+[routed-only](#routed-only-refuse-official-anthropic-models) on, a turn whose model is
+still a bare native id is refused, so fill the slots with routed ids you actually serve.
 
 ## Roster agents (injectAgents)
 

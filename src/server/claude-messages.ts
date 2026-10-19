@@ -95,7 +95,13 @@ import { resolveApiSurfaceSettings, resolveProtocolSettings } from "../protocols
 import { markProtocolBlocked, markProtocolEntry } from "../protocols/trace";
 import { recordProtocolShadowPlan } from "../protocols/shadow-plan";
 import { captureAnthropicClientIdentity } from "../adapters/anthropic/client-identity";
-import { nativeMessagesDeclineReason, type NativeMessagesSelector } from "./messages-native-eligibility";
+import {
+  isBuiltinAnthropicRoute,
+  nativeClaudeModelId,
+  nativeMessagesDeclineReason,
+  routedOnlyRefusalMessage,
+  type NativeMessagesSelector,
+} from "./messages-native-eligibility";
 import {
   isApiAuthRequired,
   isDataPlaneAdmissionSecret,
@@ -693,6 +699,17 @@ async function handleClaudeMessagesWithBudget(
     messagesFeatures = sourceEnvelope
       ? () => sourceEnvelope.features()
       : () => (scannedFeatures ??= featuresFromMessagesBody(messagesBody));
+    // Routed-only (claudeCode.routedOnly): a native Anthropic selector that no alias or
+    // interception entry claims is Anthropic-bound whatever the credential — the caller
+    // passthrough below, or after translation the proxy's own Anthropic account (checked
+    // where the route settles). Refuse before either lane can send it.
+    if (isRec(anthropicBody) && typeof anthropicBody.model === "string"
+      && cc?.routedOnly === true && nativeClaudeModelId(anthropicBody.model, cc)) {
+      logCtx.errorCode = "claude_routed_only";
+      logCtx.requestedModel = requestedModel;
+      if (logIds) addFinalRequestLog(logIds.requestId, logIds.start, logCtx, 403, { closeReason: "non_stream" });
+      return anthropicErrorResponse(403, routedOnlyRefusalMessage(anthropicBody.model), "permission_error", "claude_routed_only");
+    }
     if (!effortRow && !fastRow && isRec(anthropicBody) && wantsNativePassthrough(req, config, requestPolicy, anthropicBody.model, cc)) {
       markProtocolEntry(logCtx, { inbound: "messages", lane: "native", features: messagesFeatures });
       recordProtocolShadowPlan(logCtx, config, { inbound: "messages", model: requestedModel });
@@ -887,6 +904,15 @@ async function handleClaudeMessagesWithBudget(
     settledRoute = route;
     // Before any route-specific shaping, so a request that leaves the lane is shaped as the bridge's.
     if (directPlan && !messagesDirectPlanHolds(directPlan, route, anthropicBody as Rec, config)) directLeaveError = leaveDirectPlan();
+    // Routed-only: the translated native id above resolved onto a built-in Anthropic pool
+    // (the managed native lane and its bridge twin). Refuse here so no lane can serve it
+    // from Anthropic; a failed direct-plan leave falls through to the translation failure.
+    if (cc?.routedOnly === true && directLeaveError === undefined && isBuiltinAnthropicRoute(route)) {
+      logCtx.requestedModel = requestedModel;
+      logCtx.errorCode = "claude_routed_only";
+      if (logIds) addFinalRequestLog(logIds.requestId, logIds.start, logCtx, 403, { closeReason: "non_stream" });
+      return anthropicErrorResponse(403, routedOnlyRefusalMessage(String(internalBody.model ?? "")), "permission_error", "claude_routed_only");
+    }
     if (directEncodersApply(config, route)) {
       clientEncoder = { protocol: "messages", stream, model: requestedModel, inputTokenFloor: claudeRequestTokenFloor() };
     }
@@ -1471,6 +1497,12 @@ export async function handleClaudeCountTokens(
       raw.model = model;
     }
     captureClaudeInbound("count_tokens", raw, resolveInboundModel(model, cc), req.headers.get("anthropic-beta") ?? undefined);
+    // Routed-only: the same refusal the Messages path applies, before the caller passthrough
+    // forwards the count to Anthropic. The local estimate below touches no network, so a
+    // mapped, aliased, or windowed id still gets its count.
+    if (cc?.routedOnly === true && nativeClaudeModelId(model, cc)) {
+      return anthropicErrorResponse(403, routedOnlyRefusalMessage(model), "permission_error", "claude_routed_only");
+    }
     if (wantsNativePassthrough(req, config, requestPolicy, model, cc)) {
       return await anthropicNativePassthrough(req, config, { model, provider: "anthropic-native", surface: "claude" }, undefined, raw, "/v1/messages/count_tokens");
     }

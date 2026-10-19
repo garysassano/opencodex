@@ -25,6 +25,16 @@ function authSourceLabel(source: string | undefined, t: TFn): string {
     : t("claude.authSource.unknown");
 }
 
+/**
+ * Whether the routed-only posture has something to route the built-in defaults onto: the
+ * shared helper model or any tier slot counts. Without any of them, Claude Code's own
+ * opus/sonnet/haiku defaults stay native and every turn naming them is refused.
+ */
+function routedOnlyDefaultsMapped(state: ClaudeCodeState): boolean {
+  if (state.smallFastModel.trim() !== "") return true;
+  return Object.values(state.tierModels ?? {}).some(value => typeof value === "string" && value.trim() !== "");
+}
+
 export function ClaudeCodeSettingsCard({
   state,
   autoCompactOptions,
@@ -82,6 +92,24 @@ export function ClaudeCodeSettingsCard({
                   ? t("claude.effectiveMode.autoAbsent")
                   : t("claude.effectiveMode.autoUnknown")}
             {state.admissionKeyActive === true ? ` ${t("claude.effectiveMode.admissionKey")}` : ""}
+          </span>
+        </div>
+      )}
+
+      <div className="setting-row">
+        <div className="setting-label">
+          <span className="title">{t("claude.routedOnly")}</span>
+          <span className="desc">{t("claude.routedOnlyDesc")}</span>
+        </div>
+        <SettingToggle label={t("claude.routedOnly")} checked={state.routedOnly} onChange={routedOnly => onStateChange({ ...state, routedOnly })} />
+      </div>
+      {state.routedOnly && (
+        <div
+          className={`claude-effective-auth${!routedOnlyDefaultsMapped(state) ? " warn" : ""}`}
+          role="status"
+        >
+          <span>
+            {routedOnlyDefaultsMapped(state) ? t("claude.routedOnlyActive") : t("claude.routedOnlyDefaultsHint")}
           </span>
         </div>
       )}

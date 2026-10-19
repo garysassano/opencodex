@@ -1,12 +1,13 @@
 # 261002 Claude UX — roadmap (010)
 
-Three outcomes, four work-phases (wp1 = this roadmap).
+Three outcomes, five work-phases (wp1 = this roadmap).
 
 | wp | Unit | Doc | Branch |
 | --- | --- | --- | --- |
 | wp2 | Start the Claude intercept pair on demand instead of asking for a restart | 020 | `codex/claude-intercept-on-demand` |
 | wp3 | Top-level Claude page under Codex: Account / Code / Desktop / Settings | 030 | `codex/gui-claude-page` |
 | wp4 | Local OpenCodex.app rebuild from merged dev, install handed to the user | 040 | none |
+| wp5 | Routed-only: refuse official Anthropic models on the Messages surface | 060 | `feat/claude-routed-only` |
 
 ## Evidence
 

@@ -41,6 +41,8 @@ export interface ClaudeCodeState {
   sharedProxy: "none" | "live" | "stopped" | "disabled" | "broken" | "foreign" | "local" | "unknown";
   /** Three-state intent. "auto" resolves from detected Claude auth on every launch. */
   authMode: "auto" | "subscription" | "proxy";
+  /** Routed-only: official Anthropic models are refused in proxied Claude sessions. */
+  routedOnly: boolean;
   /** Resolved: does the opencodex dummy marker get injected. Not a native-auth claim. */
   markerMode?: "proxy" | "subscription";
   authModeOrigin?: "manual" | "auto-present" | "auto-absent" | "auto-unknown";
